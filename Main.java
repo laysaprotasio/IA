@@ -1,6 +1,3 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
 import java.io.*;
 import java.util.*;
 
@@ -72,34 +69,52 @@ class Escala {
         }
     }
 
-}
+    private static Map<String, Map<Escala.TipoServico, Integer>> lerDisponibilidades(String caminhoArquivo) {
+        Map<String, Map<Escala.TipoServico, Integer>> disponibilidade = new LinkedHashMap<>();
 
-class GerenciadorEscala {
+        try (BufferedReader br = new BufferedReader(new FileReader(caminhoArquivo))) {
+            String linhaCabecalho = br.readLine();
+            if (linhaCabecalho == null) {
+                System.out.println("Arquivo vazio.");
+                return disponibilidade;
+            }
+
+            String linha;
+            while ((linha = br.readLine()) != null) {
+                String[] valores = linha.split(",");
+                if (valores.length < 4) {
+                    continue;
+                }
+                
+                String nome = valores[0].trim();
+                if (nome.isEmpty()) {
+                    continue;
+                }
+
+                try {
+                    int inc = Integer.parseInt(valores[1].trim());
+                    int soc = Integer.parseInt(valores[2].trim());
+                    int tel = Integer.parseInt(valores[3].trim());
+
+                    Map<Escala.TipoServico, Integer> dispoServicos = new EnumMap<>(Escala.TipoServico.class);
+                    dispoServicos.put(Escala.TipoServico.INCENDIO, inc);
+                    dispoServicos.put(Escala.TipoServico.SOCORRO, soc);
+                    dispoServicos.put(Escala.TipoServico.TELEFONE, tel);
+
+                    disponibilidade.put(nome, dispoServicos);
+                } catch (NumberFormatException e) {
+                    System.out.println("Erro ao converter disponibilidade do bombeiro " + nome);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return disponibilidade;
+    }
 
     public static void executarEscala(String caminhoArquivo) {
-        List<Map<String, String>> registros = TratamentoArquivo.lerArquivoParaMapa(caminhoArquivo);
-
-        Map<String, Map<Escala.TipoServico, Integer>> disponibilidade = new LinkedHashMap<>();
-        for (Map<String, String> registro : registros) {
-            String nome = registro.get("Bombeiro");
-            if (nome == null || nome.isEmpty())
-                continue;
-            try {
-                
-                int inc = Integer.parseInt(registro.get("Incêncio"));
-                int soc = Integer.parseInt(registro.get("Socorro"));
-                int tel = Integer.parseInt(registro.get("Telefone"));
-
-                Map<Escala.TipoServico, Integer> dispoServicos = new EnumMap<>(Escala.TipoServico.class);
-                dispoServicos.put(Escala.TipoServico.INCENDIO, inc);
-                dispoServicos.put(Escala.TipoServico.SOCORRO, soc);
-                dispoServicos.put(Escala.TipoServico.TELEFONE, tel);
-
-                disponibilidade.put(nome, dispoServicos);
-            } catch (NumberFormatException e) {
-                System.out.println("Erro ao converter disponibilidade do bombeiro " + nome);
-            }
-        }
+        Map<String, Map<Escala.TipoServico, Integer>> disponibilidade = lerDisponibilidades(caminhoArquivo);
 
         Escala escala = new Escala();
 
@@ -134,50 +149,10 @@ class GerenciadorEscala {
     }
 }
 
-class TratamentoArquivo {
-
-    /**
-     *
-     * @param caminhoArquivo O caminho do arquivo a ser lido.
-     * @return Uma lista de mapas, onde cada mapa representa um registro do arquivo.
-     */
-    public static List<Map<String, String>> lerArquivoParaMapa(String caminhoArquivo) {
-        List<Map<String, String>> registros = new ArrayList<>();
-
-        try (BufferedReader br = new BufferedReader(new FileReader(caminhoArquivo))) {
-
-            String linhaCabecalho = br.readLine();
-            if (linhaCabecalho == null) {
-                System.out.println("Arquivo vazio.");
-                return registros;
-            }
-
-            String[] chaves = linhaCabecalho.split(",");
-
-            String linha;
-            while ((linha = br.readLine()) != null) {
-                String[] valores = linha.split(",");
-                Map<String, String> registro = new LinkedHashMap<>();
-
-                for (int i = 0; i < chaves.length; i++) {
-                    String valor = i < valores.length ? valores[i] : "";
-                    registro.put(chaves[i], valor);
-                }
-                registros.add(registro);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return registros;
-    }
-
-}
-
 public class Main {
     public static void main(String[] args) {
         String caminhoArquivo = "C:/Users/Laysa/Documents/IA/Bombeiros/entrada_1.txt";
-        GerenciadorEscala.executarEscala(caminhoArquivo);
+        Escala.executarEscala(caminhoArquivo);
     }
 
 }
