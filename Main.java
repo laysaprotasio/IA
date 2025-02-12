@@ -15,7 +15,7 @@ class Escala {
         INCENDIO, SOCORRO, TELEFONE;
     }
 
-    private Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocacoes;
+    private static Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocacoes;
 
     public Escala() {
         alocacoes = new EnumMap<>(TipoServico.class);
@@ -32,17 +32,17 @@ class Escala {
         }
     }
 
-    public boolean alocar(TipoServico servico, DiaSemana dia, Turno turno, String nomeBombeiro) {
-        if (bombeiroAlocado(nomeBombeiro, dia, turno)) {
-            System.out.println("Conflito: o bombeiro " + nomeBombeiro + " já está escalado em " + dia + " " + turno);
-            return false;
-        }
-        // Implementar verificação se o bombeiro tem disponibilidade
+    public static boolean alocar(TipoServico servico, DiaSemana dia, Turno turno, String nomeBombeiro) {
         alocacoes.get(servico).get(dia).put(turno, nomeBombeiro);
         return true;
     }
 
-    public boolean bombeiroAlocado(String nomeBombeiro, DiaSemana dia, Turno turno) {
+    public static boolean desalocar(TipoServico servico, DiaSemana dia, Turno turno, String nomeBombeiro) {
+        alocacoes.get(servico).get(dia).remove(turno, nomeBombeiro);
+        return true;
+    }
+
+    public static boolean bombeiroAlocado(String nomeBombeiro, DiaSemana dia, Turno turno) {
         for (TipoServico servico : TipoServico.values()) {
             String nome = alocacoes.get(servico).get(dia).get(turno);
             if (nome != null && nome.equals(nomeBombeiro)) {
@@ -125,7 +125,7 @@ class Escala {
                     for (String nome : disponibilidade.keySet()) {
                         int disponivel = disponibilidade.get(nome).get(servico);
                         if (disponivel > 0) {
-                            if (!escala.bombeiroAlocado(nome, dia, turno)) {
+                            if (!bombeiroAlocado(nome, dia, turno)) {
                                 boolean sucesso = escala.alocar(servico, dia, turno, nome);
                                 if (sucesso) {
                                     disponibilidade.get(nome).put(servico, disponivel - 1);
@@ -146,6 +146,26 @@ class Escala {
             escala.imprimirEscalaServico(servico);
             System.out.println();
         }
+    }
+
+    public static Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> backtracking(Map<String, Map<Escala.TipoServico, Integer>> disponibilidade, Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocacoes, TipoServico servico, DiaSemana dia, Turno turno){
+        
+        for (String nome : disponibilidade.keySet()) {
+            int disponivel = disponibilidade.get(nome).get(servico);
+            if (disponivel > 0 && !bombeiroAlocado(nome, dia, turno)){
+                alocar(servico, dia, turno, nome);
+                disponibilidade.get(nome).put(servico, disponivel - 1);
+                Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocado = backtracking(disponibilidade, alocacoes, servico, dia, turno);
+                if(alocado != null){
+                    return alocado;
+                } else{
+                    desalocar(servico, dia, turno, nome);
+                    disponibilidade.get(nome).put(servico, disponivel + 1);
+                }
+            } 
+        }
+
+        return null;
     }
 }
 
