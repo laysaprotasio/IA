@@ -15,7 +15,43 @@ class Escala {
         INCENDIO, SOCORRO, TELEFONE;
     }
 
-    private static Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocacoes;
+    public static Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocacoes;
+
+    private static class Momento {
+        TipoServico servico;
+        DiaSemana dia;
+        Turno turno;
+
+        public Momento(TipoServico servico, DiaSemana dia, Turno turno) {
+            this.servico = servico;
+            this.dia = dia;
+            this.turno = turno;
+        }
+    }
+
+    private static Momento proximoMomento(TipoServico servico, DiaSemana dia, Turno turno) {
+        Turno[] turnos = Turno.values();
+        DiaSemana[] dias = DiaSemana.values();
+        TipoServico[] servicos = TipoServico.values();
+
+        int indiceTurno = turno.ordinal();
+        int indiceDia = dia.ordinal();
+        int indiceServico = servico.ordinal();
+
+        if (indiceTurno < turnos.length - 1) {
+            return new Momento(servico, dia, turnos[indiceTurno + 1]);
+        } else {
+            if (indiceDia < dias.length - 1) {
+                return new Momento(servico, dias[indiceDia + 1], turnos[0]);
+            } else {
+                if (indiceServico < servicos.length - 1) {
+                    return new Momento(servicos[indiceServico + 1], dias[0], turnos[0]);
+                } else {
+                    return null;
+                }
+            }
+        }
+    }
 
     public Escala() {
         alocacoes = new EnumMap<>(TipoServico.class);
@@ -69,7 +105,7 @@ class Escala {
         }
     }
 
-    private static Map<String, Map<Escala.TipoServico, Integer>> lerDisponibilidades(String caminhoArquivo) {
+    public static Map<String, Map<Escala.TipoServico, Integer>> lerDisponibilidades(String caminhoArquivo) {
         Map<String, Map<Escala.TipoServico, Integer>> disponibilidade = new LinkedHashMap<>();
 
         try (BufferedReader br = new BufferedReader(new FileReader(caminhoArquivo))) {
@@ -85,7 +121,7 @@ class Escala {
                 if (valores.length < 4) {
                     continue;
                 }
-                
+
                 String nome = valores[0].trim();
                 if (nome.isEmpty()) {
                     continue;
@@ -113,58 +149,30 @@ class Escala {
         return disponibilidade;
     }
 
-    public static void executarEscala(String caminhoArquivo) {
-        Map<String, Map<Escala.TipoServico, Integer>> disponibilidade = lerDisponibilidades(caminhoArquivo);
+    public static Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> backtracking(
+            Map<String, Map<Escala.TipoServico, Integer>> disponibilidade,
+            Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocacoes, TipoServico servico, DiaSemana dia,
+            Turno turno) {
 
-        Escala escala = new Escala();
-
-        for (Escala.TipoServico servico : Escala.TipoServico.values()) {
-            for (Escala.DiaSemana dia : Escala.DiaSemana.values()) {
-                for (Escala.Turno turno : Escala.Turno.values()) {
-                    boolean alocado = false;
-                    for (String nome : disponibilidade.keySet()) {
-                        int disponivel = disponibilidade.get(nome).get(servico);
-                        if (disponivel > 0) {
-                            if (!bombeiroAlocado(nome, dia, turno)) {
-                                boolean sucesso = escala.alocar(servico, dia, turno, nome);
-                                if (sucesso) {
-                                    disponibilidade.get(nome).put(servico, disponivel - 1);
-                                    alocado = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if (!alocado) {
-                        escala.alocar(servico, dia, turno, "SEM ALOCACAO");
-                    }
+        for (String nome : disponibilidade.keySet()) {
+            int disponivel = disponibilidade.get(nome).get(servico);
+            if (disponivel > 0 && !bombeiroAlocado(nome, dia, turno)) {
+                alocar(servico, dia, turno, nome);
+                disponibilidade.get(nome).put(servico, disponivel - 1);
+                Momento proximo = proximoMomento(servico, dia, turno);
+                if (proximo == null) {
+                    return alocacoes;
+                }
+                Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocado = backtracking(disponibilidade, alocacoes,
+                        proximo.servico, proximo.dia, proximo.turno);
+                if (alocado != null) {
+                    return alocado;
+                } else {
+                    desalocar(servico, dia, turno, nome);
+                    disponibilidade.get(nome).put(servico, disponivel);
                 }
             }
         }
-
-        for (Escala.TipoServico servico : Escala.TipoServico.values()) {
-            escala.imprimirEscalaServico(servico);
-            System.out.println();
-        }
-    }
-
-    public static Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> backtracking(Map<String, Map<Escala.TipoServico, Integer>> disponibilidade, Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocacoes, TipoServico servico, DiaSemana dia, Turno turno){
-        
-        for (String nome : disponibilidade.keySet()) {
-            int disponivel = disponibilidade.get(nome).get(servico);
-            if (disponivel > 0 && !bombeiroAlocado(nome, dia, turno)){
-                alocar(servico, dia, turno, nome);
-                disponibilidade.get(nome).put(servico, disponivel - 1);
-                Map<TipoServico, Map<DiaSemana, Map<Turno, String>>> alocado = backtracking(disponibilidade, alocacoes, servico, dia, turno);
-                if(alocado != null){
-                    return alocado;
-                } else{
-                    desalocar(servico, dia, turno, nome);
-                    disponibilidade.get(nome).put(servico, disponivel + 1);
-                }
-            } 
-        }
-
         return null;
     }
 }
@@ -172,7 +180,24 @@ class Escala {
 public class Main {
     public static void main(String[] args) {
         String caminhoArquivo = "C:/Users/Laysa/Documents/IA/Bombeiros/entrada_1.txt";
-        Escala.executarEscala(caminhoArquivo);
-    }
 
+        Map<String, Map<Escala.TipoServico, Integer>> disponibilidade = Escala.lerDisponibilidades(caminhoArquivo);
+
+        Escala escala = new Escala();
+
+        Map<Escala.TipoServico, Map<Escala.DiaSemana, Map<Escala.Turno, String>>> resultado = Escala.backtracking(
+                disponibilidade, Escala.alocacoes,
+                Escala.TipoServico.INCENDIO,
+                Escala.DiaSemana.DOM,
+                Escala.Turno.PRIMEIRO);
+
+        if (resultado != null) {
+            for (Escala.TipoServico servico : Escala.TipoServico.values()) {
+                escala.imprimirEscalaServico(servico);
+                System.out.println();
+            }
+        } else {
+            System.out.println("Não foi possível completar a alocação com backtracking.");
+        }
+    }
 }
